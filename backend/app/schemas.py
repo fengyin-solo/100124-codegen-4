@@ -28,6 +28,36 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class BatchCheckoutItem(BaseModel):
+    """批量出库中的一行：箱体 id 加逐条填写的归属站点。"""
+
+    entry_id: int
+    归属站点: str | None = None
+
+
+class BatchCheckoutPayload(BaseModel):
+    """批量出库提交：统一出库日期 + 逐条归属站点。"""
+
+    出库日期: str | None = None
+    items: list[BatchCheckoutItem] = Field(default_factory=list)
+
+
+class BatchRecyclePayload(BaseModel):
+    """批量回收提交：一组箱体 id。"""
+
+    entry_ids: list[int] = Field(default_factory=list)
+
+
+class BatchResult(BaseModel):
+    """批量操作结果：成功与失败逐条列明，失败的可单独重试。"""
+
+    ok: bool
+    message: str
+    succeeded: list[dict[str, Any]] = Field(default_factory=list)
+    failed: list[dict[str, Any]] = Field(default_factory=list)
+    records: list[dict[str, Any]] = Field(default_factory=list)
+
+
 
 class FleetEntry(BaseModel):
     """冷链车明细结构。"""

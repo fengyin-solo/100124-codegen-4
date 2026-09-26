@@ -1,18 +1,25 @@
-"""温控箱体接口：维护温控箱体，覆盖调度出库、清洗消毒、申请报废等动作。"""
+"""温控箱体接口：维护温控箱体，覆盖调度出库、批量出库/回收、站点盘点等动作。"""
 from __future__ import annotations
 
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas import ActionResult, EntryPayload, PageResult
+from app.schemas import (
+    ActionResult,
+    BatchCheckoutPayload,
+    BatchRecyclePayload,
+    BatchResult,
+    EntryPayload,
+    PageResult,
+)
 from app.services.box import BoxService
 
 router = APIRouter(prefix="/api/box", tags=["温控箱体"])
 
 service = BoxService()
 
-LIST_FIELDS = ["箱体编号", "箱体类型", "内部容积", "保温材料", "温控范围", "出库日期", "归属站点", "箱体状态"]
+LIST_FIELDS = ["箱体编号", "箱体类型", "内部容积", "保温材料", "保温材料状态", "温控范围", "出库日期", "归属站点", "箱体状态"]
 STATUSES = ["可用", "使用中", "清洗中", "报废"]
 
 
@@ -30,13 +37,43 @@ def list_entries(
     return PageResult(items=items, total=total, page=page, size=size)
 
 
-@router.get("/{entry_id}", response_model=dict)
-def get_entry(entry_id: int) -> dict:
-    """读取单条温控箱体明细；不存在时给出可读的错误说明。"""
-    entry = service.get_entry(entry_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail=f"温控箱体 {entry_id} 不存在或已归档")
-    return entry
+# 注意：字面量路径必须声明在 /{entry_id} 之前，否则会被当成 id 解析而 422。
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出温控箱体清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "box", "total": total, "items": items}
+
+
+@router.get("/station-inventory")
+def station_inventory() -> dict[str, Any]:
+    """站点盘点：按归属站点分组列出在场箱体，温控范围直接取台账数据。"""
+    groups = service.station_inventory()
+    return {"module": "box", "total": len(groups), "items": groups}
+
+
+@router.get("/checkout-records")
+def checkout_records() -> dict[str, Any]:
+    """出库单列表：不同箱体类型拆分为不同出库单，明细挂在箱体编号下。"""
+    records = service.list_checkout_records()
+    return {"module": "box", "total": len(records), "items": records}
+
+
+@router.post("/batch-checkout", response_model=BatchResult)
+def batch_checkout(payload: BatchCheckoutPayload) -> BatchResult:
+    """批量出库：整组提交、逐条校验，成功的直接生效不回滚，失败的说明原因可单独重试。"""
+    result = service.batch_checkout(
+        payload.出库日期 or "",
+        [item.model_dump() for item in payload.items],
+    )
+    return BatchResult(**result)
+
+
+@router.post("/batch-recycle", response_model=BatchResult)
+def batch_recycle(payload: BatchRecyclePayload) -> BatchResult:
+    """批量回收：保温材料受损或已报废的箱体单独挑出，只回收还能用的。"""
+    result = service.batch_recycle(payload.entry_ids)
+    return BatchResult(**result)
 
 
 @router.post("", response_model=ActionResult)
@@ -48,6 +85,15 @@ def create_entry(payload: EntryPayload) -> ActionResult:
     return ActionResult(ok=True, message="温控箱体已登记", entry=entry)
 
 
+@router.get("/{entry_id}", response_model=dict)
+def get_entry(entry_id: int) -> dict:
+    """读取单条温控箱体明细（含挂在箱体编号下的出库记录）；不存在时给出可读的错误说明。"""
+    entry = service.get_entry(entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"温控箱体 {entry_id} 不存在或已归档")
+    return entry
+
+
 @router.post("/{entry_id}/actions", response_model=ActionResult)
 def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     """对单条温控箱体执行调度出库、清洗消毒、申请报废；不允许的动作会被拦下并说明原因。"""
@@ -56,10 +102,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出温控箱体清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "box", "total": total, "items": items}
