@@ -28,6 +28,56 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class BatchOutboundItem(BaseModel):
+    """批量出库的逐条内容：箱体逐条填写归属站点，出库日期整组统一。"""
+
+    id: int
+    箱体编号: str | None = None
+    归属站点: str | None = None
+
+
+class BatchOutboundPayload(BaseModel):
+    """整组出库提交：统一出库日期 + 逐条箱体（站点）。"""
+
+    items: list[BatchOutboundItem] = Field(default_factory=list)
+    出库日期: str
+
+
+class BatchReturnItem(BaseModel):
+    """批量回收的逐条内容：只提交还能用的箱体编号。"""
+
+    id: int
+    箱体编号: str | None = None
+
+
+class BatchReturnPayload(BaseModel):
+    """整组回收提交：统一回收日期 + 逐条箱体；受损/报废由后端再次卡口。"""
+
+    items: list[BatchReturnItem] = Field(default_factory=list)
+    回收日期: str | None = None
+
+
+class BatchResultItem(BaseModel):
+    """批量动作的逐条结果：卡住时给出箱体编号与可读原因，供仅重试失败项。"""
+
+    id: Any
+    箱体编号: str | None = None
+    归属站点: str | None = None
+    ok: bool
+    reason: str = ""
+
+
+class BatchActionResult(BaseModel):
+    """整组提交的部分成功结果：HTTP 始终 200，成败逐条说明，不做整组回滚。"""
+
+    ok: bool
+    message: str
+    items: list[BatchResultItem] = Field(default_factory=list)
+    records: list[dict[str, Any]] = Field(default_factory=list)
+    reusable: list[dict[str, Any]] | None = None
+    excluded: list[dict[str, Any]] | None = None
+
+
 
 class FleetEntry(BaseModel):
     """冷链车明细结构。"""

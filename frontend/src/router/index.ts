@@ -12,6 +12,7 @@ const Abnormal2 = () => import('@/views/abnormal2/index.vue')
 const Renew = () => import('@/views/renew/index.vue')
 const Refriger = () => import('@/views/refriger/index.vue')
 const Box = () => import('@/views/box/index.vue')
+const Inventory = () => import('@/views/inventory/index.vue')
 const Route = () => import('@/views/route/index.vue')
 const Sensor = () => import('@/views/sensor/index.vue')
 const Cost = () => import('@/views/cost/index.vue')
@@ -37,6 +38,7 @@ const router = createRouter({
     { path: '/renew', name: 'renew', component: Renew },
     { path: '/refriger', name: 'refriger', component: Refriger },
     { path: '/box', name: 'box', component: Box },
+    { path: '/inventory', name: 'inventory', component: Inventory },
     { path: '/route', name: 'route', component: Route },
     { path: '/sensor', name: 'sensor', component: Sensor },
     { path: '/cost', name: 'cost', component: Cost },
